@@ -18,12 +18,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Materialize packet
+        id: packet
         run: |
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             EVENT_TYPE="${{ github.event.action }}"
+            echo "event_type=$EVENT_TYPE" >> "$GITHUB_OUTPUT"
+            
             if [ "$EVENT_TYPE" = "code-task" ]; then
               # Simple format from orchestrator: { repo, task }
-              cat > task-packet.json << 'EOF'
+              cat > task-packet.json << EOF
           {
             "target_repo": "${{ github.event.client_payload.repo }}",
             "task": "${{ github.event.client_payload.task }}",
@@ -31,11 +34,22 @@ jobs:
             "mode": "implement"
           }
           EOF
+            elif [ "$EVENT_TYPE" = "answer-questions" ]; then
+              # Question-answering mode
+              cat > task-packet.json << EOF
+          {
+            "target_repo": "${{ github.event.client_payload.repo }}",
+            "task": "Answer questions in QUESTIONS.md",
+            "branch": "agent/answers-$(date +%Y%m%d-%H%M%S)",
+            "mode": "answer-questions"
+          }
+          EOF
             else
               # Full packet format
               printf '%s' '${{ github.event.client_payload.packet_json }}' > task-packet.json
             fi
           else
+            echo "event_type=workflow_dispatch" >> "$GITHUB_OUTPUT"
             printf '%s' '${{ inputs.packet_json }}' > task-packet.json
           fi
           cat task-packet.json
@@ -48,9 +62,22 @@ jobs:
           TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
           GIT_USER_NAME: ${{ vars.GIT_USER_NAME || 'public-runner-bot' }}
           GIT_USER_EMAIL: ${{ vars.GIT_USER_EMAIL || 'bot@public-runner.local' }}
+          PROXY_API_KEY: ${{ secrets.PROXY_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           TARGET_ROOT=$(bash runner/checkout_target.sh task-packet.json target-repo)
-          bash runner/run_agent.sh task-packet.json "$TARGET_ROOT"
+          
+          # Check mode from packet
+          MODE=$(python3 -c "import json; print(json.load(open('task-packet.json')).get('mode', 'implement'))")
+          
+          if [ "$MODE" = "answer-questions" ]; then
+            # Question-answering mode - no code changes
+            bash runner/answer_questions.sh task-packet.json "$TARGET_ROOT"
+          else
+            # Normal agentic coding mode
+            bash runner/run_agent.sh task-packet.json "$TARGET_ROOT"
+          fi
+          
           PR_URL=$(bash runner/push_branch_and_pr.sh task-packet.json "$TARGET_ROOT")
           python3 runner/report_result.py task-packet.json "$PR_URL" runner-result.json
 
