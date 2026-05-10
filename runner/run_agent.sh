@@ -84,7 +84,7 @@ Keep it simple and functional. Include a README.md with usage instructions."""
 
 # Try VPS gateway first (VPS_IP_REDACTED:8000)
 endpoints = [
-    ("http://VPS_IP_REDACTED:8000/v1/chat/completions", os.environ.get("PROXY_API_KEY", "GATEWAY_KEY_REDACTED"), "coding-fast"),
+    ("http://VPS_IP_REDACTED:8000/v1/chat/completions", os.environ.get("PROXY_API_KEY", "GATEWAY_KEY_REDACTED"), "coding-elite"),
     ("https://api.groq.com/openai/v1/chat/completions", os.environ.get("GROQ_API_KEY", ""), "llama-3.3-70b-versatile"),
 ]
 
