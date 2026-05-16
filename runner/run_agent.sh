@@ -66,7 +66,7 @@ if command -v opencode &>/dev/null; then
     export OPENCODE_PROVIDER_VPS_GATEWAY_API_KEY="${PROXY_API_KEY:-GATEWAY_KEY_REDACTED}"
     export OPENCODE_PROVIDER_GROQ_API_KEY="${GROQ_API_KEY:-}"
 
-    if timeout 3600 opencode run "$TASK_TEXT" --model "vps-gateway/coding-elite" --format json 2>&1 | tee .runner-log.txt; then
+    if timeout 3600 opencode run "$TASK_TEXT" --format json 2>&1 | tee .runner-log.txt; then
         echo ">>> OpenCode completed successfully"
         AGENT_SUCCESS=true
     else
