@@ -15,9 +15,9 @@ def main() -> None:
     output_path = Path(sys.argv[3])
 
     result: dict[str, Any] = {
-        "task_id": packet["task_id"],
-        "target_repo": packet["target_repo"],
-        "branch": packet["work_branch"],
+        "task_id": packet.get("task_id", packet.get("id", "unknown")),
+        "target_repo": packet.get("target_repo", packet.get("repo", "unknown")),
+        "branch": packet.get("work_branch", packet.get("branch", "unknown")),
         "pr_url": pr_url,
         "status": "opened_pr",
         "checks_passed": False,

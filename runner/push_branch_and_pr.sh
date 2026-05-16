@@ -4,7 +4,7 @@ set -euo pipefail
 PACKET_FILE="${1:?Usage: push_branch_and_pr.sh <packet.json> <target-root>}"
 TARGET_ROOT="${2:?Usage: push_branch_and_pr.sh <packet.json> <target-root>}"
 
-read -r TARGET_REPO TARGET_BRANCH TASK_SUMMARY DRAFT_FLAG < <(python3 - <<'PY' "$PACKET_FILE"
+python3 - "$PACKET_FILE" > /tmp/push-params.txt << 'PY'
 import json, sys
 from pathlib import Path
 packet = json.loads(Path(sys.argv[1]).read_text())
@@ -12,9 +12,12 @@ repo = packet.get('target_repo', packet.get('repo', ''))
 target = packet.get('target_branch', 'main')
 task = packet.get('task_summary', packet.get('task', 'Automated implementation'))[:100]
 draft = '--draft' if packet.get('draft_pr') else ''
-print(f"{repo}\t{target}\t{task}\t{draft}")
+Path('/tmp/push-task.txt').write_text(task)
+print(f"{repo}\t{target}\t{draft}")
 PY
-)
+
+read -r TARGET_REPO TARGET_BRANCH DRAFT_FLAG < /tmp/push-params.txt
+TASK_SUMMARY=$(cat /tmp/push-task.txt)
 
 if [ -z "${TARGET_REPO_TOKEN:-}" ]; then
     echo "ERROR: TARGET_REPO_TOKEN must be set" >&2

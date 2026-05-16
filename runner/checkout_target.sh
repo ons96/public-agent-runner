@@ -3,7 +3,8 @@ set -euo pipefail
 
 PACKET_FILE="${1:?Usage: checkout_target.sh <packet.json>}"
 TARGET_ROOT="${2:-target-repo}"
-read -r TARGET_REPO TARGET_BRANCH WORK_BRANCH < <(python3 - <<'PY' "$PACKET_FILE"
+
+python3 - "$PACKET_FILE" > /tmp/checkout-params.txt << 'PY'
 import json, sys
 from pathlib import Path
 packet = json.loads(Path(sys.argv[1]).read_text())
@@ -12,7 +13,8 @@ target = packet.get('target_branch', 'main')
 work = packet.get('work_branch', packet.get('branch', f"agent/auto-{repo.split('/')[-1][:20]}"))
 print(f"{repo}\t{target}\t{work}")
 PY
-)
+
+read -r TARGET_REPO TARGET_BRANCH WORK_BRANCH < /tmp/checkout-params.txt
 
 if [ -z "${TARGET_REPO_TOKEN:-}" ]; then
     echo "ERROR: TARGET_REPO_TOKEN must be set" >&2
