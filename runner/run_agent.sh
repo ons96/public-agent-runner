@@ -64,7 +64,8 @@ if command -v opencode &>/dev/null; then
     export OPENCODE_PROVIDER_GROQ_FALLBACK_API_KEY="${GROQ_API_KEY:-}"
     
     # Run OpenCode in non-interactive mode with the task
-    if timeout 3600 opencode run "$TASK_TEXT" --format json 2>&1 | tee .runner-log.txt; then
+    # Explicitly set model to prevent auto-discovery picking wrong model
+    if timeout 3600 opencode run "$TASK_TEXT" --model "vps-gateway:coding-elite" --format json 2>&1 | tee .runner-log.txt; then
         echo ">>> OpenCode completed successfully"
         AGENT_SUCCESS=true
     else

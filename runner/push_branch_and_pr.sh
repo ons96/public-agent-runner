@@ -21,6 +21,7 @@ if [ -z "${TARGET_REPO_TOKEN:-}" ]; then
     exit 1
 fi
 
+PACKET_FILE=$(cd "$(dirname "$PACKET_FILE")" && pwd)/$(basename "$PACKET_FILE")
 cd "$TARGET_ROOT"
 git config user.name "${GIT_USER_NAME:-public-runner-bot}"
 git config user.email "${GIT_USER_EMAIL:-bot@public-runner.local}"
