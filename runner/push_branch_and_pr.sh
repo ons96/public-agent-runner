@@ -39,7 +39,7 @@ PYBR
 git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
 git add -A
 git commit -m "feat(runner): ${TASK_SUMMARY}" || true
-git push --force-with-lease origin "$BRANCH_NAME" 2>/dev/null || git push origin "$BRANCH_NAME" 
+git push --force-with-lease origin "$BRANCH_NAME" >&2 || git push origin "$BRANCH_NAME" >&2 
 export GH_TOKEN="$TARGET_REPO_TOKEN"
 PR_URL=$(gh pr create --repo "$TARGET_REPO" --title "$TASK_SUMMARY" --body "Automated change from public runner." --base "$TARGET_BRANCH" ${DRAFT_FLAG:+$DRAFT_FLAG} 2>/dev/null || echo "")
 printf '%s\n' "$PR_URL"
