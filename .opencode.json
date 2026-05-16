@@ -1,0 +1,56 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permissions": {
+    "*": "allow"
+  },
+  "providers": {
+    "vps-gateway": {
+      "name": "VPS LLM Gateway",
+      "type": "openai",
+      "baseURL": "http://VPS_IP_REDACTED:8000/v1",
+      "models": {
+        "coding-elite": {
+          "name": "coding-elite",
+          "contextWindow": 128000,
+          "maxOutputTokens": 16000
+        },
+        "coding-smart": {
+          "name": "coding-smart",
+          "contextWindow": 128000,
+          "maxOutputTokens": 16000
+        },
+        "coding-fast": {
+          "name": "coding-fast",
+          "contextWindow": 32000,
+          "maxOutputTokens": 8000
+        }
+      }
+    },
+    "groq": {
+      "name": "Groq",
+      "type": "openai",
+      "baseURL": "https://api.groq.com/openai/v1",
+      "models": {
+        "llama-3.3-70b-versatile": {
+          "name": "llama-3.3-70b-versatile",
+          "contextWindow": 128000,
+          "maxOutputTokens": 8000
+        }
+      }
+    }
+  },
+  "agents": {
+    "default": {
+      "model": "vps-gateway:coding-elite",
+      "maxTokens": 16000
+    },
+    "task": {
+      "model": "groq:llama-3.3-70b-versatile",
+      "maxTokens": 8000
+    }
+  },
+  "mcp": {},
+  "ui": {
+    "theme": "dark"
+  }
+}
