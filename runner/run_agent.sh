@@ -1,23 +1,29 @@
 #!/usr/bin/env bash
 # run_agent.sh - Execute agentic coding task on target repo
-# Priority: Stock OpenCode (efficient) → OMO (autonomous) → Direct LLM API
+# Priority: Stock OpenCode (efficient) -> OMO (autonomous) -> Direct LLM API
 set -euo pipefail
 
 PACKET_FILE="${1:?Usage: run_agent.sh <packet.json> <target-root>}"
 TARGET_ROOT="${2:?Usage: run_agent.sh <packet.json> <target-root>}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Extract task details from packet
-read -r TARGET_REPO TASK_TEXT MODE < <(python3 - <<'PY' "$PACKET_FILE"
+PACKET_FILE=$(cd "$(dirname "$PACKET_FILE")" && pwd)/$(basename "$PACKET_FILE")
+
+python3 - "$PACKET_FILE" > /tmp/runner-vars.txt << 'PY'
 import json, sys
 from pathlib import Path
 packet = json.loads(Path(sys.argv[1]).read_text())
 repo = packet.get('target_repo', packet.get('repo', ''))
-task = packet.get('task', packet.get('task_summary', 'implement the project'))
+task = packet.get('task_prompt') or packet.get('task') or packet.get('task_summary', 'implement the project')
 mode = packet.get('mode', 'implement')
-print(f"{repo}\t{task[:500]}\t{mode}")
+Path("/tmp/runner-task.txt").write_text(task)
+print(repo)
+print(mode)
 PY
-)
+
+TARGET_REPO=$(sed -n '1p' /tmp/runner-vars.txt)
+MODE=$(sed -n '2p' /tmp/runner-vars.txt)
+TASK_TEXT=$(cat /tmp/runner-task.txt)
 
 echo "=== Runner Agent ==="
 echo "Repo: $TARGET_REPO"
@@ -26,7 +32,6 @@ echo "Mode: $MODE"
 
 cd "$TARGET_ROOT"
 
-# Write task file for reference
 cat > .runner-task.md << EOF
 # Agentic Coding Task
 
@@ -48,23 +53,19 @@ EOF
 
 AGENT_SUCCESS=false
 
-# =============================================================================
+# =====================================================================
 # OPTION 1: Stock OpenCode (most token-efficient)
-# =============================================================================
+# =====================================================================
 if command -v opencode &>/dev/null; then
     echo ">>> Trying stock OpenCode (efficient mode)..."
-    
-    # Copy runner config if not exists
+
     if [ -f "$SCRIPT_DIR/opencode-runner.json" ]; then
         cp "$SCRIPT_DIR/opencode-runner.json" .opencode.json
     fi
-    
-    # Set API keys from environment
+
     export OPENCODE_PROVIDER_VPS_GATEWAY_API_KEY="${PROXY_API_KEY:-GATEWAY_KEY_REDACTED}"
-    export OPENCODE_PROVIDER_GROQ_FALLBACK_API_KEY="${GROQ_API_KEY:-}"
-    
-    # Run OpenCode in non-interactive mode with the task
-    # Explicitly set model to prevent auto-discovery picking wrong model
+    export OPENCODE_PROVIDER_GROQ_API_KEY="${GROQ_API_KEY:-}"
+
     if timeout 3600 opencode run "$TASK_TEXT" --model "vps-gateway:coding-elite" --format json 2>&1 | tee .runner-log.txt; then
         echo ">>> OpenCode completed successfully"
         AGENT_SUCCESS=true
@@ -73,19 +74,15 @@ if command -v opencode &>/dev/null; then
     fi
 fi
 
-# =============================================================================
-# OPTION 2: oh-my-opencode (more autonomous, higher token usage)
-# =============================================================================
+# =====================================================================
+# OPTION 2: oh-my-opencode (autonomous mode)
+# =====================================================================
 if [ "$AGENT_SUCCESS" = false ]; then
     if command -v omo &>/dev/null || command -v bunx &>/dev/null; then
         echo ">>> Trying oh-my-opencode (autonomous mode)..."
-        
-        # Install omo if not present
         if ! command -v omo &>/dev/null; then
             bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --opencode-go=no 2>/dev/null || true
         fi
-        
-        # Run omo with the task
         if command -v omo &>/dev/null; then
             if timeout 3600 omo --task "$TASK_TEXT" --auto-approve 2>&1 | tee -a .runner-log.txt; then
                 echo ">>> OMO completed successfully"
@@ -95,20 +92,17 @@ if [ "$AGENT_SUCCESS" = false ]; then
     fi
 fi
 
-# =============================================================================
+# =====================================================================
 # OPTION 3: Direct LLM API (fallback for simple code generation)
-# =============================================================================
+# =====================================================================
 if [ "$AGENT_SUCCESS" = false ]; then
-    # Only use direct API if no code files exist yet
     if [ ! -f "src/main.py" ] && [ ! -f "index.js" ] && [ ! -f "main.go" ] && [ ! -f "main.rs" ]; then
         echo ">>> Generating initial project structure via direct LLM API..."
-        
-        python3 << 'PYGEN' "$TASK_TEXT" "$TARGET_ROOT"
-import json, os, sys
-import urllib.request
+        python3 - "$TARGET_ROOT" << 'PYGEN'
+import json, os, sys, urllib.request
 
-task = sys.argv[1]
-root = sys.argv[2]
+root = sys.argv[1]
+task = open("/tmp/runner-task.txt").read()
 
 prompt = f"""Create a simple implementation for this project idea:
 
@@ -119,7 +113,6 @@ Respond with ONLY a JSON object containing files to create:
 
 Keep it simple and functional. Include a README.md with usage instructions."""
 
-# Try VPS gateway first (VPS_IP_REDACTED:8000)
 endpoints = [
     ("http://VPS_IP_REDACTED:8000/v1/chat/completions", os.environ.get("PROXY_API_KEY", "GATEWAY_KEY_REDACTED"), "coding-elite"),
     ("https://api.groq.com/openai/v1/chat/completions", os.environ.get("GROQ_API_KEY", ""), "llama-3.3-70b-versatile"),
@@ -130,17 +123,8 @@ for url, api_key, model in endpoints:
     if not api_key:
         continue
     try:
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        data = json.dumps({
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 4000,
-            "temperature": 0.3
-        }).encode()
-        
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        data = json.dumps({"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 4000, "temperature": 0.3}).encode()
         req = urllib.request.Request(url, data, headers)
         resp = urllib.request.urlopen(req, timeout=120)
         result = json.loads(resp.read())
@@ -151,10 +135,8 @@ for url, api_key, model in endpoints:
         continue
 
 if result:
-    content = result["choices"][0]["message"]["content"]
-    
-    # Extract JSON from response
     import re
+    content = result["choices"][0]["message"]["content"]
     match = re.search(r'\{[\s\S]*"files"[\s\S]*\}', content)
     if match:
         files_data = json.loads(match.group())
@@ -165,12 +147,16 @@ if result:
                 fp.write(f["content"])
             print(f"Created: {f['path']}")
 else:
-    print("All LLM endpoints failed")
+    print("All LLM endpoints failed - creating minimal scaffolding")
+    main_path = os.path.join(root, "src", "main.py")
+    os.makedirs(os.path.dirname(main_path), exist_ok=True)
+    with open(main_path, "w") as fp:
+        fp.write('"""Auto-generated scaffold"""\n\ndef main():\n    print("Hello from agent")\n\nif __name__ == "__main__":\n    main()\n')
+    print("Created: src/main.py")
 PYGEN
     fi
 fi
 
-# Ensure README exists
 if [ ! -f README.md ]; then
     cat > README.md << EOF
 # $(basename "$TARGET_REPO")
@@ -180,13 +166,8 @@ $TASK_TEXT
 ## Setup
 
 \`\`\`bash
-# Install dependencies (if any)
-pip install -r requirements.txt  # or npm install
+pip install -r requirements.txt
 \`\`\`
-
-## Usage
-
-See source files for implementation details.
 
 ---
 *Generated by autonomous coding agent*
