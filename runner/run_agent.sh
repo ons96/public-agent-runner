@@ -63,7 +63,7 @@ if command -v opencode &>/dev/null; then
         cp "$SCRIPT_DIR/opencode-runner.json" .opencode.json
     fi
 
-    export OPENCODE_PROVIDER_VPS_GATEWAY_API_KEY="${PROXY_API_KEY:-GATEWAY_KEY_REDACTED}"
+    export OPENCODE_PROVIDER_VPS_GATEWAY_API_KEY="${PROXY_API_KEY:-}"
     export OPENCODE_PROVIDER_GROQ_API_KEY="${GROQ_API_KEY:-}"
 
     if timeout 3600 opencode run "$TASK_TEXT" --format json 2>&1 | tee .runner-log.txt; then
@@ -114,7 +114,7 @@ Respond with ONLY a JSON object containing files to create:
 Keep it simple and functional. Include a README.md with usage instructions."""
 
 endpoints = [
-    ("http://VPS_IP_REDACTED:8000/v1/chat/completions", os.environ.get("PROXY_API_KEY", "GATEWAY_KEY_REDACTED"), "coding-elite"),
+    ("${GATEWAY_BASE_URL:-}/v1/chat/completions", os.environ.get("PROXY_API_KEY", ""), "coding-elite"),
     ("https://api.groq.com/openai/v1/chat/completions", os.environ.get("GROQ_API_KEY", ""), "llama-3.3-70b-versatile"),
 ]
 
