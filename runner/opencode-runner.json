@@ -1,0 +1,53 @@
+{
+  "provider": {
+    "opencode_zen": {
+      "apiKey": "",
+      "baseURL": "https://opencode.ai/zen/v1",
+      "models": {
+        "default": "nemotron-3-super-free",
+        "fast": "deepseek-v4-flash-free",
+        "thinking": "minimax-m2.5-free"
+      }
+    },
+    "nvidia": {
+      "apiKey": "",
+      "baseURL": "https://integrate.api.nvidia.com/v1",
+      "models": {
+        "default": "meta/llama-3.3-70b-instruct",
+        "fast": "meta/llama-3.1-8b-instruct"
+      }
+    },
+    "groq": {
+      "apiKey": "",
+      "baseURL": "https://api.groq.com/openai/v1",
+      "models": {
+        "default": "llama-3.3-70b-versatile",
+        "fast": "llama-3.1-8b-instant"
+      }
+    },
+    "cerebras": {
+      "apiKey": "",
+      "baseURL": "https://api.cerebras.ai/v1",
+      "models": {
+        "default": "llama3.1-8b",
+        "fast": "llama3.1-8b"
+      }
+    },
+    "openrouter": {
+      "apiKey": "",
+      "baseURL": "https://openrouter.ai/api/v1",
+      "models": {
+        "default": "deepseek/deepseek-v4-flash:free",
+        "fast": "google/gemma-4-26b:free",
+        "thinking": "nvidia/llama-3.1-nemotron-3-super:free"
+      }
+    }
+  },
+  "fallback_chain": [
+    "opencode_zen",
+    "nvidia",
+    "groq",
+    "cerebras",
+    "openrouter"
+  ]
+}

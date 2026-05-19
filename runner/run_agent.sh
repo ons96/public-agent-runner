@@ -12,23 +12,29 @@ PACKET_FILE=$(cd "$(dirname "$PACKET_FILE")" && pwd)/$(basename "$PACKET_FILE")
 python3 - "$PACKET_FILE" > /tmp/runner-vars.txt << 'PY'
 import json, sys
 from pathlib import Path
+
 packet = json.loads(Path(sys.argv[1]).read_text())
 repo = packet.get('target_repo', packet.get('repo', ''))
-task = packet.get('task_prompt') or packet.get('task') or packet.get('task_summary', 'implement the project')
+task = packet.get('task_summary') or packet.get('task') or packet.get('task_prompt', 'implement the project')
 mode = packet.get('mode', 'implement')
+issue_number = packet.get('issue_number', '')
+
 Path("/tmp/runner-task.txt").write_text(task)
 print(repo)
 print(mode)
+print(issue_number)
 PY
 
 TARGET_REPO=$(sed -n '1p' /tmp/runner-vars.txt)
 MODE=$(sed -n '2p' /tmp/runner-vars.txt)
+ISSUE_NUMBER=$(sed -n '3p' /tmp/runner-vars.txt)
 TASK_TEXT=$(cat /tmp/runner-task.txt)
 
 echo "=== Runner Agent ==="
 echo "Repo: $TARGET_REPO"
 echo "Task: ${TASK_TEXT:0:100}..."
 echo "Mode: $MODE"
+echo "Issue: ${ISSUE_NUMBER:-none}"
 
 cd "$TARGET_ROOT"
 
@@ -59,18 +65,31 @@ AGENT_SUCCESS=false
 if command -v opencode &>/dev/null; then
     echo ">>> Trying stock OpenCode (efficient mode)..."
 
-    if [ -f "$SCRIPT_DIR/opencode-runner.json" ]; then
+    if [ -f "$SCRIPT_DIR/opencode-runner.json" ] && [ -s "$SCRIPT_DIR/opencode-runner.json" ]; then
         cp "$SCRIPT_DIR/opencode-runner.json" .opencode.json
+        echo ">>> Copied opencode-runner.json to .opencode.json"
+    else
+        echo ">>> WARNING: opencode-runner.json is empty or missing"
     fi
 
     export OPENCODE_PROVIDER_VPS_GATEWAY_API_KEY="${PROXY_API_KEY:-}"
     export OPENCODE_PROVIDER_GROQ_API_KEY="${GROQ_API_KEY:-}"
 
-    if timeout 3600 opencode run "$TASK_TEXT" --format json 2>&1 | tee .runner-log.txt; then
-        echo ">>> OpenCode completed successfully"
-        AGENT_SUCCESS=true
+    set +e
+    timeout 3600 opencode run "$TASK_TEXT" --format json 2>&1 | tee .runner-log.txt
+    PIPE_EXIT=${PIPESTATUS[0]}
+    set -e
+
+    if [ "$PIPE_EXIT" -eq 0 ]; then
+        if grep -q '"type":"error"' .runner-log.txt 2>/dev/null || \
+           grep -q '"error"' .runner-log.txt 2>/dev/null | grep -qv '"error":null'; then
+            echo ">>> OpenCode returned API error in output, trying fallback..."
+        else
+            echo ">>> OpenCode completed successfully"
+            AGENT_SUCCESS=true
+        fi
     else
-        echo ">>> OpenCode failed or timed out, trying fallback..."
+        echo ">>> OpenCode exited with code $PIPE_EXIT, trying fallback..."
     fi
 fi
 
@@ -84,9 +103,15 @@ if [ "$AGENT_SUCCESS" = false ]; then
             bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --opencode-go=no 2>/dev/null || true
         fi
         if command -v omo &>/dev/null; then
-            if timeout 3600 omo --task "$TASK_TEXT" --auto-approve 2>&1 | tee -a .runner-log.txt; then
+            set +e
+            timeout 3600 omo --task "$TASK_TEXT" --auto-approve 2>&1 | tee -a .runner-log.txt
+            OMO_EXIT=$?
+            set -e
+            if [ "$OMO_EXIT" -eq 0 ]; then
                 echo ">>> OMO completed successfully"
                 AGENT_SUCCESS=true
+            else
+                echo ">>> OMO exited with code $OMO_EXIT"
             fi
         fi
     fi
@@ -99,14 +124,12 @@ if [ "$AGENT_SUCCESS" = false ]; then
     if [ ! -f "src/main.py" ] && [ ! -f "index.js" ] && [ ! -f "main.go" ] && [ ! -f "main.rs" ]; then
         echo ">>> Generating initial project structure via direct LLM API..."
         python3 - "$TARGET_ROOT" << 'PYGEN'
-import json, os, sys, urllib.request
+import json, os, sys, re, urllib.request
 
 root = sys.argv[1]
 task = open("/tmp/runner-task.txt").read()
 
-prompt = f"""Create a simple implementation for this project idea:
-
-{task}
+prompt = f"""Create a simple implementation for this project idea: {task}
 
 Respond with ONLY a JSON object containing files to create:
 {{"files": [{{"path": "src/main.py", "content": "..."}}]}}
@@ -114,8 +137,9 @@ Respond with ONLY a JSON object containing files to create:
 Keep it simple and functional. Include a README.md with usage instructions."""
 
 endpoints = [
-    ("${GATEWAY_BASE_URL:-}/v1/chat/completions", os.environ.get("PROXY_API_KEY", ""), "coding-elite"),
     ("https://api.groq.com/openai/v1/chat/completions", os.environ.get("GROQ_API_KEY", ""), "llama-3.3-70b-versatile"),
+    ("https://openrouter.ai/api/v1/chat/completions", os.environ.get("OPENROUTER_API_KEY", ""), "deepseek/deepseek-v4-flash:free"),
+    ("https://integrate.api.nvidia.com/v1/chat/completions", os.environ.get("NVIDIA_API_KEY", ""), "meta/llama-3.3-70b-instruct"),
 ]
 
 result = None
@@ -124,18 +148,22 @@ for url, api_key, model in endpoints:
         continue
     try:
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        data = json.dumps({"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 4000, "temperature": 0.3}).encode()
+        data = json.dumps({
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 4000,
+            "temperature": 0.3
+        }).encode()
         req = urllib.request.Request(url, data, headers)
         resp = urllib.request.urlopen(req, timeout=120)
         result = json.loads(resp.read())
         print(f"Using: {url} ({model})")
         break
     except Exception as e:
-        print(f"Endpoint {url} failed: {e}")
+        print(f"Endpoint {url} ({model}) failed: {e}")
         continue
 
 if result:
-    import re
     content = result["choices"][0]["message"]["content"]
     match = re.search(r'\{[\s\S]*"files"[\s\S]*\}', content)
     if match:
@@ -146,6 +174,8 @@ if result:
             with open(path, "w") as fp:
                 fp.write(f["content"])
             print(f"Created: {f['path']}")
+    else:
+        print("LLM response did not contain valid files JSON")
 else:
     print("All LLM endpoints failed - creating minimal scaffolding")
     main_path = os.path.join(root, "src", "main.py")
@@ -155,6 +185,14 @@ else:
     print("Created: src/main.py")
 PYGEN
     fi
+fi
+
+# Run secret guard on all files before any commit
+if [ -f "$SCRIPT_DIR/secret_guard.py" ]; then
+    echo ">>> Scanning for leaked secrets..."
+    python3 "$SCRIPT_DIR/secret_guard.py" . 2>/dev/null || {
+        echo ">>> WARNING: Secret guard detected potential leaks!"
+    }
 fi
 
 if [ ! -f README.md ]; then
@@ -172,6 +210,13 @@ pip install -r requirements.txt
 ---
 *Generated by autonomous coding agent*
 EOF
+fi
+
+# Write agent status for report_result.py
+if [ "$AGENT_SUCCESS" = true ]; then
+    echo "true" > /tmp/agent-success.txt
+else
+    echo "false" > /tmp/agent-success.txt
 fi
 
 echo "=== Agent run complete ==="
