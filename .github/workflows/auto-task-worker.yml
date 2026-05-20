@@ -1,4 +1,5 @@
 name: Auto Task Worker
+run-name: "Auto Task Worker - ${{ inputs.issue_number || 'poll' }}"
 
 on:
   schedule:
