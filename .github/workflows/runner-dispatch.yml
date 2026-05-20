@@ -57,20 +57,6 @@ jobs:
       - name: Validate packet
         run: python3 runner/validate_packet.py task-packet.json
 
-      - name: Setup Node.js (for OMO fallback)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install OpenCode
-        run: |
-          # Install stock OpenCode (token-efficient agentic coding)
-          curl -fsSL https://opencode.ai/install | bash || true
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          
-          # Verify installation
-          which opencode && opencode --version || echo "OpenCode not available, will use fallback"
-
       - name: Execute workflow
         env:
           TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}

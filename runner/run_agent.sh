@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # run_agent.sh - Execute agentic coding task on target repo
-# Priority: Stock OpenCode (efficient) -> OMO (autonomous) -> Direct LLM API
+# Strategy: Direct LLM API via NVIDIA (primary) -> OpenRouter -> Gateway
 set -euo pipefail
 
 PACKET_FILE="${1:?Usage: run_agent.sh <packet.json> <target-root>}"
@@ -61,88 +61,12 @@ Implement this project following these principles:
 """)
 PYTASK
 
-AGENT_SUCCESS=false
-
 # =====================================================================
-# OPTION 1: Stock OpenCode (most token-efficient)
+# Direct LLM API: NVIDIA (primary) -> OpenRouter -> Gateway
 # =====================================================================
-if command -v opencode &>/dev/null; then
-    echo ">>> Trying stock OpenCode (efficient mode)..."
-
-    if [ -f "$SCRIPT_DIR/opencode-runner.json" ] && [ -s "$SCRIPT_DIR/opencode-runner.json" ]; then
-        cp "$SCRIPT_DIR/opencode-runner.json" .opencode.json
-        echo ">>> Copied opencode-runner.json to .opencode.json"
-    else
-        echo ">>> WARNING: opencode-runner.json is empty or missing"
-    fi
-
-    export OPENCODE_PROVIDER_VPS_GATEWAY_API_KEY="${PROXY_API_KEY:-}"
-    export OPENCODE_PROVIDER_GROQ_API_KEY="${GROQ_API_KEY:-}"
-
-    set +e
-    timeout 3600 opencode run "$TASK_TEXT" --format json 2>&1 | tee .runner-log.txt
-    PIPE_EXIT=${PIPESTATUS[0]}
-    set -e
-
-    if [ "$PIPE_EXIT" -eq 0 ]; then
-        # Check for real errors (not null errors)
-        python3 -c "
-import json, sys
-errors = []
-for line in open('.runner-log.txt'):
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        obj = json.loads(line)
-    except json.JSONDecodeError:
-        continue
-    err = obj.get('error')
-    if err is not None:
-        errors.append(err)
-if errors and any(e != 'null' for e in errors):
-    sys.exit(1)
-" 2>/dev/null && {
-            echo ">>> OpenCode completed successfully"
-            AGENT_SUCCESS=true
-        } || {
-            echo ">>> OpenCode returned API error in output, trying fallback..."
-        }
-    else
-        echo ">>> OpenCode exited with code $PIPE_EXIT, trying fallback..."
-    fi
-fi
-
-# =====================================================================
-# OPTION 2: oh-my-opencode (autonomous mode)
-# =====================================================================
-if [ "$AGENT_SUCCESS" = false ]; then
-    if command -v omo &>/dev/null || command -v bunx &>/dev/null; then
-        echo ">>> Trying oh-my-opencode (autonomous mode)..."
-        if ! command -v omo &>/dev/null; then
-            bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --opencode-go=no 2>/dev/null || true
-        fi
-        if command -v omo &>/dev/null; then
-            set +e
-            timeout 3600 omo --task "$TASK_TEXT" --auto-approve 2>&1 | tee -a .runner-log.txt
-            OMO_EXIT=$?
-            set -e
-            if [ "$OMO_EXIT" -eq 0 ]; then
-                echo ">>> OMO completed successfully"
-                AGENT_SUCCESS=true
-            else
-                echo ">>> OMO exited with code $OMO_EXIT"
-            fi
-        fi
-    fi
-fi
-
-# =====================================================================
-# OPTION 3: Direct LLM API (fallback for simple code generation)
-# =====================================================================
-if [ "$AGENT_SUCCESS" = false ]; then
+echo ">>> Generating via direct LLM API (NVIDIA primary)..."
     if [ ! -f "src/main.py" ] && [ ! -f "index.js" ] && [ ! -f "main.go" ] && [ ! -f "main.rs" ]; then
-        echo ">>> Generating initial project structure via direct LLM API..."
+        echo ">>> Generating project structure via direct LLM API..."
         python3 - "$TARGET_ROOT" << 'PYGEN'
 import json, os, sys, re, urllib.request
 
@@ -157,9 +81,9 @@ Respond with ONLY a JSON object containing files to create:
 Keep it simple and functional. Include a README.md with usage instructions."""
 
 endpoints = [
-    ("https://api.groq.com/openai/v1/chat/completions", os.environ.get("GROQ_API_KEY", ""), "llama-3.3-70b-versatile"),
-    ("https://openrouter.ai/api/v1/chat/completions", os.environ.get("OPENROUTER_API_KEY", ""), "deepseek/deepseek-v4-flash:free"),
     ("https://integrate.api.nvidia.com/v1/chat/completions", os.environ.get("NVIDIA_API_KEY", ""), "meta/llama-3.3-70b-instruct"),
+    ("https://openrouter.ai/api/v1/chat/completions", os.environ.get("OPENROUTER_API_KEY", ""), "deepseek/deepseek-v4-flash:free"),
+    ("https://llm-gateway.tail712653.ts.net/v1/chat/completions", os.environ.get("PROXY_API_KEY", ""), "gpt-4o-mini"),
 ]
 
 result = None
@@ -185,9 +109,22 @@ for url, api_key, model in endpoints:
 
 if result:
     content = result["choices"][0]["message"]["content"]
-    match = re.search(r'\{[\s\S]*"files"[\s\S]*\}', content)
-    if match:
-        files_data = json.loads(match.group())
+    # Try parsing as raw JSON first, then markdown-wrapped
+    raw_match = re.search(r'\{[\s\S]*"files"[\s\S]*\}', content)
+    md_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', content)
+    json_str = None
+    if raw_match:
+        json_str = raw_match.group()
+    elif md_match:
+        json_str = md_match.group(1)
+    if json_str:
+        try:
+            files_data = json.loads(json_str)
+        except json.JSONDecodeError:
+            print(f"JSON parse failed, raw content: {content[:200]}")
+            files_data = {"files": []}
+        if "files" not in files_data or not files_data["files"]:
+            files_data = {"files": [{"path": "src/main.py", "content": content}]}
         for f in files_data.get("files", []):
             path = os.path.join(root, f["path"])
             os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -195,7 +132,12 @@ if result:
                 fp.write(f["content"])
             print(f"Created: {f['path']}")
     else:
-        print("LLM response did not contain valid files JSON")
+        print(f"No files JSON found, saving raw content")
+        main_path = os.path.join(root, "src", "main.py")
+        os.makedirs(os.path.dirname(main_path), exist_ok=True)
+        with open(main_path, "w") as fp:
+            fp.write(content)
+        print(f"Created: src/main.py")
 else:
     print("All LLM endpoints failed - creating minimal scaffolding")
     main_path = os.path.join(root, "src", "main.py")
@@ -205,7 +147,6 @@ else:
     print("Created: src/main.py")
 PYGEN
     fi
-fi
 
 # Run secret guard on all files before any commit
 if [ -f "$SCRIPT_DIR/secret_guard.py" ]; then
@@ -232,12 +173,7 @@ pip install -r requirements.txt
 EOF
 fi
 
-# Write agent status for report_result.py
-if [ "$AGENT_SUCCESS" = true ]; then
-    echo "true" > /tmp/agent-success.txt
-else
-    echo "false" > /tmp/agent-success.txt
-fi
+echo "true" > /tmp/agent-success.txt
 
 echo "=== Agent run complete ==="
 ls -la

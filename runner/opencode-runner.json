@@ -1,14 +1,6 @@
 {
-  "model": "groq/llama-3.3-70b-versatile",
+  "model": "nvidia/meta/llama-3.3-70b-instruct",
   "provider": {
-    "groq": {
-      "apiKey": "$GROQ_API_KEY",
-      "baseURL": "https://api.groq.com/openai/v1",
-      "models": {
-        "default": "llama-3.3-70b-versatile",
-        "fast": "llama-3.1-8b-instant"
-      }
-    },
     "nvidia": {
       "apiKey": "$NVIDIA_API_KEY",
       "baseURL": "https://integrate.api.nvidia.com/v1",
@@ -36,9 +28,8 @@
     }
   },
   "fallback_chain": [
-    "groq",
     "nvidia",
-    "gateway",
-    "openrouter"
+    "openrouter",
+    "gateway"
   ]
 }
