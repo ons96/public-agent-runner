@@ -23,7 +23,7 @@ git config user.name "${GIT_USER_NAME:-public-runner-bot}"
 git config user.email "${GIT_USER_EMAIL:-bot@public-runner.local}"
 
 BRANCH_NAME=$(python3 - "$PACKET_FILE" << 'PYBR'
-import json, sys, time, uuid
+import json, sys, time, uuid, datetime
 from pathlib import Path
 
 p = json.loads(Path(sys.argv[1]).read_text())
@@ -31,18 +31,20 @@ cycle = p.get("task_id", "")
 if not cycle:
     issue = p.get("issue_number", "")
     if issue:
-        cycle = f"task-{issue}"
+        ts = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+        cycle = f"task-{issue}-{ts}"
     else:
         cycle = f"auto-{int(time.time())}-{uuid.uuid4().hex[:6]}"
-cycle = cycle[:60].replace(" ", "-")
+cycle = cycle[:100].replace(" ", "-")
 print(f"agent-runner/{cycle}")
 PYBR
 )
 
 git checkout -B "$BRANCH_NAME"
 
-CHANGES=$(git diff --stat HEAD 2>/dev/null || echo "")
-if [ -z "$CHANGES" ]; then
+CHANGES=$(git diff --stat --cached 2>/dev/null || echo "")
+STAGED=$(git diff --stat 2>/dev/null || echo "")
+if [ -z "$CHANGES" ] && [ -z "$STAGED" ]; then
     echo "No changes to commit"
     printf ''
     exit 0

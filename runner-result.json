@@ -1,0 +1,10 @@
+{
+  "task_id": "unknown",
+  "target_repo": "ons96/task-board",
+  "branch": "unknown",
+  "issue_number": "68",
+  "pr_url": "No changes to commit",
+  "status": "opened_pr",
+  "agent_success": true,
+  "checks_passed": false
+}
