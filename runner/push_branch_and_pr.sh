@@ -42,9 +42,8 @@ PYBR
 
 git checkout -B "$BRANCH_NAME"
 
-CHANGES=$(git diff --stat --cached 2>/dev/null || echo "")
-STAGED=$(git diff --stat 2>/dev/null || echo "")
-if [ -z "$CHANGES" ] && [ -z "$STAGED" ]; then
+CHANGES=$(git status --porcelain 2>/dev/null || echo "")
+if [ -z "$CHANGES" ]; then
     echo "No changes to commit"
     printf ''
     exit 0
