@@ -34,15 +34,17 @@ jobs:
           ISSUE="${{ inputs.issue_number }}"
           if [ -z "$ISSUE" ]; then
             echo "Polling task-board for next task..."
-            ISSUES=$(gh issue list \
-              --repo ons96/task-board \
-              --label "status:new" \
-              --label "priority:P0" \
-              --label "priority:P1" \
-              --label "priority:P2" \
-              --json number,title,labels \
-              --limit 20 \
-              --state open 2>/dev/null)
+        ISSUES=$(gh issue list \
+          --repo ons96/task-board \
+          --label "status:new" \
+          --json number,title,labels \
+          --limit 50 \
+          --state open 2>/dev/null | python3 -c "
+import json, sys
+issues = json.load(sys.stdin)
+filtered = [i for i in issues if any(l['name'] in ('priority:P0','priority:P1','priority:P2') for l in i.get('labels',[]))]
+print(json.dumps(filtered[:20]))
+")
             if [ -z "$ISSUES" ] || [ "$ISSUES" = "[]" ]; then
               echo "No pending tasks found"
               echo "has_task=false" >> "$GITHUB_OUTPUT"
@@ -94,8 +96,12 @@ for l in labels:
         break
 " 2>/dev/null || echo "")
           fi
-          echo "target_repo=$TARGET_REPO" >> "$GITHUB_OUTPUT"
-          echo "has_task=true" >> "$GITHUB_OUTPUT"
+if [ -z "$TARGET_REPO" ]; then
+  TARGET_REPO="ons96/task-board"
+  echo "No project label found, defaulting to task-board"
+fi
+echo "target_repo=$TARGET_REPO" >> "$GITHUB_OUTPUT"
+echo "has_task=true" >> "$GITHUB_OUTPUT"
 
       - name: Lock task (claim)
         if: steps.task.outputs.has_task == 'true'
