@@ -37,7 +37,9 @@ jobs:
             ISSUES=$(gh issue list \
               --repo ons96/task-board \
               --label "status:new" \
-              --label "priority:P0,P1,P2" \
+              --label "priority:P0" \
+              --label "priority:P1" \
+              --label "priority:P2" \
               --json number,title,labels \
               --limit 20 \
               --state open 2>/dev/null)
