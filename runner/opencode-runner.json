@@ -4,8 +4,8 @@
       "apiKey": "",
       "baseURL": "https://opencode.ai/zen/v1",
       "models": {
-        "default": "nemotron-3-super-free",
-        "fast": "deepseek-v4-flash-free",
+        "default": "deepseek-v4-flash-free",
+        "fast": "nemotron-3-super-free",
         "thinking": "minimax-m2.5-free"
       }
     },
