@@ -41,11 +41,20 @@
         "fast": "google/gemma-4-26b:free",
         "thinking": "nvidia/llama-3.1-nemotron-3-super:free"
       }
+    },
+    "gateway": {
+      "apiKey": "$PROXY_API_KEY",
+      "baseURL": "https://llm-gateway.tail712653.ts.net/v1",
+      "models": {
+        "default": "gpt-4o-mini",
+        "fast": "gpt-4o-mini"
+      }
     }
   },
   "fallback_chain": [
     "opencode_zen",
     "groq",
+    "gateway",
     "openrouter",
     "nvidia",
     "cerebras"
