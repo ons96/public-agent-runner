@@ -67,10 +67,10 @@ PYTASK
 echo ">>> Generating via direct LLM API (NVIDIA primary)..."
     if [ ! -f "src/main.py" ] && [ ! -f "index.js" ] && [ ! -f "main.go" ] && [ ! -f "main.rs" ]; then
         echo ">>> Generating project structure via direct LLM API..."
-        python3 - "$TARGET_ROOT" << 'PYGEN'
+        python3 - << 'PYGEN'
 import json, os, sys, re, urllib.request
 
-root = sys.argv[1]
+root = os.getcwd()
 task = open("/tmp/runner-task.txt").read()
 
 prompt = f"""Create a simple implementation for this project idea: {task}
