@@ -39,7 +39,7 @@ print(f"agent-runner/{cycle}")
 PYBR
 )
 
-git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
+git checkout -B "$BRANCH_NAME"
 
 CHANGES=$(git diff --stat HEAD 2>/dev/null || echo "")
 if [ -z "$CHANGES" ]; then
@@ -56,7 +56,7 @@ export GH_TOKEN="$TARGET_REPO_TOKEN"
 
 PR_BODY="Automated change from public runner."
 if [ -n "$ISSUE_NUMBER" ]; then
-    PR_BODY="${PR_BODY}\n\nCloses ons96/task-board#${ISSUE_NUMBER}"
+    PR_BODY="${PR_BODY}"$'\n\n'"Closes ons96/task-board#${ISSUE_NUMBER}"
 fi
 
 PR_URL=$(gh pr create \

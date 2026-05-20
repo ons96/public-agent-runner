@@ -38,15 +38,18 @@ echo "Issue: ${ISSUE_NUMBER:-none}"
 
 cd "$TARGET_ROOT"
 
-cat > .runner-task.md << EOF
-# Agentic Coding Task
+python3 - "$TARGET_REPO" "$MODE" /tmp/runner-task.txt << 'PYTASK' > .runner-task.md
+import sys
+repo, mode, task_file = sys.argv[1], sys.argv[2], sys.argv[3]
+task = open(task_file).read()
+print(f"""# Agentic Coding Task
 
-**Repository:** $TARGET_REPO
-**Mode:** $MODE
+**Repository:** {repo}
+**Mode:** {mode}
 
 ## Task Description
 
-$TASK_TEXT
+{task}
 
 ## Instructions
 
@@ -55,7 +58,8 @@ Implement this project following these principles:
 2. Add appropriate error handling
 3. Include basic tests if applicable
 4. Update README.md with usage instructions
-EOF
+""")
+PYTASK
 
 AGENT_SUCCESS=false
 
@@ -81,13 +85,29 @@ if command -v opencode &>/dev/null; then
     set -e
 
     if [ "$PIPE_EXIT" -eq 0 ]; then
-        if grep -q '"type":"error"' .runner-log.txt 2>/dev/null || \
-           grep -q '"error"' .runner-log.txt 2>/dev/null | grep -qv '"error":null'; then
-            echo ">>> OpenCode returned API error in output, trying fallback..."
-        else
+        # Check for real errors (not null errors)
+        python3 -c "
+import json, sys
+errors = []
+for line in open('.runner-log.txt'):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        obj = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    err = obj.get('error')
+    if err is not None:
+        errors.append(err)
+if errors and any(e != 'null' for e in errors):
+    sys.exit(1)
+" 2>/dev/null && {
             echo ">>> OpenCode completed successfully"
             AGENT_SUCCESS=true
-        fi
+        } || {
+            echo ">>> OpenCode returned API error in output, trying fallback..."
+        }
     else
         echo ">>> OpenCode exited with code $PIPE_EXIT, trying fallback..."
     fi

@@ -23,6 +23,11 @@ jobs:
           TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
           GIT_USER_NAME: ${{ vars.GIT_USER_NAME || 'public-runner-bot' }}
           GIT_USER_EMAIL: ${{ vars.GIT_USER_EMAIL || 'bot@public-runner.local' }}
+          PROXY_API_KEY: ${{ secrets.PROXY_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
         run: |
           TARGET_ROOT=$(bash runner/checkout_target.sh "${{ inputs.packet_path }}" target-repo)
           bash runner/run_agent.sh "${{ inputs.packet_path }}" "$TARGET_ROOT"

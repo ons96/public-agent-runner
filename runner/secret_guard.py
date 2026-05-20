@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import re
 import sys
 from pathlib import Path
@@ -16,15 +14,45 @@ PATTERNS = [
     r"Bearer [A-Za-z0-9\-._~+/]+=*",
 ]
 
+IGNORED_DIRS = {".git", "__pycache__", ".venv", "node_modules", ".opencode", ".gitignore"}
+
+
+def scan_file(path: Path) -> list[str]:
+    hits = []
+    try:
+        content = path.read_text(errors="replace")
+        for pattern in PATTERNS:
+            if re.search(pattern, content):
+                hits.append(f"  {path}: matched {pattern}")
+    except (OSError, UnicodeDecodeError):
+        pass
+    return hits
+
+
+def scan_dir(path: Path) -> list[str]:
+    hits = []
+    for entry in path.rglob("*"):
+        if entry.is_dir() or any(ign in entry.parts for ign in IGNORED_DIRS):
+            continue
+        hits += scan_file(entry)
+    return hits
+
 
 def main() -> None:
     if len(sys.argv) != 2:
-        raise SystemExit("Usage: secret_guard.py <file>")
+        raise SystemExit("Usage: secret_guard.py <path>")
 
-    content = Path(sys.argv[1]).read_text()
-    for pattern in PATTERNS:
-        if re.search(pattern, content):
-            raise SystemExit(f"Potential secret detected matching {pattern}")
+    target = Path(sys.argv[1])
+    if not target.exists():
+        raise SystemExit(f"Path not found: {target}")
+
+    hits = scan_dir(target) if target.is_dir() else scan_file(target)
+
+    if hits:
+        print("SECRET GUARD FAILED — potential secrets detected:")
+        for h in hits:
+            print(h)
+        raise SystemExit(1)
     print("Secret guard passed")
 
 
