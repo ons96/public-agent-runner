@@ -1,8 +1,20 @@
 {
-  "model": "nvidia/meta/llama-3.3-70b-instruct",
+  "plugin": ["@kodrunhq/opencode-autopilot"],
+  "model": "vps-gateway/coding-elite",
   "provider": {
+    "vps-gateway": {
+      "apiKey": "{file:vps-gateway.key}",
+      "baseURL": "https://llm-gateway.tail712653.ts.net/v1",
+      "models": {
+        "coding-elite": "coding-elite",
+        "coding-smart": "coding-smart",
+        "coding-fast": "coding-fast",
+        "chat-smart": "chat-smart",
+        "chat-fast": "chat-fast"
+      }
+    },
     "nvidia": {
-      "apiKey": "$NVIDIA_API_KEY",
+      "apiKey": "{file:nvidia.key}",
       "baseURL": "https://integrate.api.nvidia.com/v1",
       "models": {
         "default": "meta/llama-3.3-70b-instruct",
@@ -10,26 +22,12 @@
       }
     },
     "openrouter": {
-      "apiKey": "$OPENROUTER_API_KEY",
+      "apiKey": "{file:openrouter.key}",
       "baseURL": "https://openrouter.ai/api/v1",
       "models": {
         "default": "deepseek/deepseek-v4-flash:free",
-        "fast": "google/gemma-4-26b:free",
-        "thinking": "nvidia/llama-3.1-nemotron-3-super:free"
-      }
-    },
-    "gateway": {
-      "apiKey": "$PROXY_API_KEY",
-      "baseURL": "https://llm-gateway.tail712653.ts.net/v1",
-      "models": {
-        "default": "gpt-4o-mini",
-        "fast": "gpt-4o-mini"
+        "fast": "google/gemma-4-26b:free"
       }
     }
-  },
-  "fallback_chain": [
-    "nvidia",
-    "openrouter",
-    "gateway"
-  ]
+  }
 }

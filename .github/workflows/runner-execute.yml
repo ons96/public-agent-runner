@@ -11,31 +11,48 @@ on:
 jobs:
   execute:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout runner repo
-        uses: actions/checkout@v4
+    - name: Checkout runner repo
+      uses: actions/checkout@v4
 
-      - name: Validate packet
-        run: python3 runner/validate_packet.py "${{ inputs.packet_path }}"
+    - name: Validate packet
+      run: python3 runner/validate_packet.py "${{ inputs.packet_path }}"
 
-      - name: Execute workflow
-        env:
-          TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
-          GIT_USER_NAME: ${{ vars.GIT_USER_NAME || 'public-runner-bot' }}
-          GIT_USER_EMAIL: ${{ vars.GIT_USER_EMAIL || 'bot@public-runner.local' }}
-          PROXY_API_KEY: ${{ secrets.PROXY_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
-        run: |
-          TARGET_ROOT=$(bash runner/checkout_target.sh "${{ inputs.packet_path }}" target-repo)
-          bash runner/run_agent.sh "${{ inputs.packet_path }}" "$TARGET_ROOT"
-          PR_URL=$(bash runner/push_branch_and_pr.sh "${{ inputs.packet_path }}" "$TARGET_ROOT")
-          python3 runner/report_result.py "${{ inputs.packet_path }}" "$PR_URL" runner-result.json
+    - name: Setup opencode + autopilot
+      run: |
+        curl -fsSL https://opencode.ai/install | bash
+        echo "$HOME/.opencode/bin" >> $GITHUB_PATH
+        curl -fsSL https://bun.sh/install | bash
+        echo "$HOME/.bun/bin" >> $GITHUB_PATH
 
-      - name: Upload runner result
-        uses: actions/upload-artifact@v4
-        with:
-          name: runner-result
-          path: runner-result.json
+    - name: Install autopilot plugin
+      run: |
+        export PATH="$HOME/.opencode/bin:$HOME/.bun/bin:$PATH"
+        bun add -g @kodrunhq/opencode-autopilot
+        bunx @kodrunhq/opencode-autopilot install --yes || true
+        mkdir -p "$HOME/.config/opencode"
+        cp runner/opencode-autopilot.json "$HOME/.config/opencode/opencode-autopilot.json"
+
+    - name: Execute workflow
+      env:
+        TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+        GIT_USER_NAME: ${{ vars.GIT_USER_NAME || 'public-runner-bot' }}
+        GIT_USER_EMAIL: ${{ vars.GIT_USER_EMAIL || 'bot@public-runner.local' }}
+        PROXY_API_KEY: ${{ secrets.PROXY_API_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+      run: |
+        export PATH="$HOME/.opencode/bin:$HOME/.bun/bin:$PATH"
+        TARGET_ROOT=$(bash runner/checkout_target.sh "${{ inputs.packet_path }}" target-repo)
+        bash runner/run_agent.sh "${{ inputs.packet_path }}" "$TARGET_ROOT"
+        PR_URL=$(bash runner/push_branch_and_pr.sh "${{ inputs.packet_path }}" "$TARGET_ROOT")
+        python3 runner/report_result.py "${{ inputs.packet_path }}" "$PR_URL" runner-result.json
+
+    - name: Upload runner result
+      uses: actions/upload-artifact@v4
+      with:
+        name: runner-result
+        path: runner-result.json

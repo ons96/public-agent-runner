@@ -1,0 +1,103 @@
+{
+  "version": 7,
+  "configured": true,
+  "groups": {
+    "architects": {
+      "primary": "vps-gateway/coding-elite",
+      "fallbacks": ["vps-gateway/coding-smart", "vps-gateway/coding-fast", "vps-gateway/chat-smart"],
+      "agents": ["autopilot", "planner", "architect", "critic"]
+    },
+    "builders": {
+      "primary": "vps-gateway/coding-smart",
+      "fallbacks": ["vps-gateway/coding-fast"],
+      "agents": ["coder", "implementer", "debugger"]
+    },
+    "reviewers": {
+      "primary": "vps-gateway/chat-smart",
+      "fallbacks": ["vps-gateway/coding-smart", "vps-gateway/coding-fast"],
+      "agents": ["reviewer", "code-quality-auditor", "security-auditor", "test-interrogator"]
+    },
+    "researchers": {
+      "primary": "vps-gateway/coding-elite",
+      "fallbacks": ["vps-gateway/chat-smart", "vps-gateway/coding-fast"],
+      "agents": ["researcher", "domain-analyst", "tool-evaluator"]
+    }
+  },
+  "overrides": {
+    "oc-researcher": { "primary": "vps-gateway/coding-elite" },
+    "oc-challenger": { "primary": "vps-gateway/coding-elite" },
+    "oc-architect": { "primary": "vps-gateway/coding-elite" },
+    "oc-critic": { "primary": "vps-gateway/chat-smart" },
+    "oc-planner": { "primary": "vps-gateway/coding-smart" },
+    "oc-implementer": { "primary": "vps-gateway/coding-smart" },
+    "oc-reviewer": { "primary": "vps-gateway/chat-smart" },
+    "oc-shipper": { "primary": "vps-gateway/coding-fast" }
+  },
+  "orchestrator": {
+    "autonomy": "full",
+    "strictness": "normal",
+    "phases": {
+      "recon": true,
+      "challenge": true,
+      "architect": true,
+      "explore": true,
+      "plan": true,
+      "build": true,
+      "ship": true,
+      "retrospective": true
+    },
+    "maxParallelTasks": 5
+  },
+  "confidence": {
+    "enabled": true,
+    "thresholds": {
+      "proceed": "MEDIUM",
+      "abort": "LOW"
+    }
+  },
+  "fallback": {
+    "enabled": true,
+    "retryOnErrors": [401, 402, 429, 500, 502, 503, 504],
+    "maxFallbackAttempts": 10,
+    "cooldownSeconds": 60,
+    "timeoutSeconds": 30,
+    "notifyOnFallback": true
+  },
+  "memory": {
+    "enabled": true,
+    "injectionBudget": 2000,
+    "decayHalfLifeDays": 90
+  },
+  "notifications": {
+    "desktop": false,
+    "rateLimit": 5000
+  },
+  "background": {
+    "enabled": true,
+    "maxConcurrent": 5,
+    "persistence": true
+  },
+  "autonomy": {
+    "enabled": true,
+    "verification": "normal",
+    "maxIterations": 20
+  },
+  "mode": {
+    "interactionMode": "ci",
+    "executionMode": "foreground",
+    "visibilityMode": "summary",
+    "verificationMode": "normal"
+  },
+  "routing": {
+    "enabled": true,
+    "categories": {}
+  },
+  "recovery": {
+    "enabled": true,
+    "maxRetries": 3
+  },
+  "hashline_edit": {
+    "enabled": true,
+    "enforce_for_agents": ["oc-implementer", "autopilot"]
+  }
+}
