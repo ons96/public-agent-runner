@@ -17,7 +17,7 @@ git log --oneline --all | head -3
 # If you see commits from before 2026-05-19 with NEW hashes (not the ones
 # you remember), you have the new history.  You are fine.
 
-grep -r "40.233.101.233" .git/ --include="*" 2>/dev/null | head -3
+grep -r "<VPS40_IP>" .git/ --include="*" 2>/dev/null | head -3
 # If this prints anything, your clone still has the old history.
 ```
 
@@ -56,7 +56,7 @@ git reflog expire --expire=now --all
 git gc --prune=now --aggressive
 ```
 
-After this, `grep -r "40.233.101.233" .git/` should return nothing.
+After this, `grep -r "<VPS40_IP>" .git/` should return nothing.
 
 ### 2. (If you had local branches not on origin)
 
@@ -125,7 +125,7 @@ If you are an AI agent reading this at the start of a session:
 
 1. Check `git status` and `git log --oneline -3` for signs of divergence
 2. If this repo looks stale, run the "Sync this clone" commands above
-3. Verify no old secrets remain with `grep -r "40.233.101.233\|poop96" . --include="*" 2>/dev/null`
+3. Verify no old secrets remain with `grep -r "<VPS40_IP>\|poop96" . --include="*" 2>/dev/null`
 4. The `.secrets.baseline` file in the repo root is a detect-secrets audit file
    (all findings are verified false positives).  Ignore it unless you want to
    add secret scanning to this project.
