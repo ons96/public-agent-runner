@@ -7,6 +7,10 @@ on:
 
 jobs:
   gitleaks:
+    # GitHub names the check after the job, and this job published lowercase
+    # "gitleaks" while branch protection requires "Gitleaks" - so no run could
+    # ever satisfy it and every PR here sat BLOCKED.
+    name: Gitleaks
     runs-on: ubuntu-latest
     permissions:
       contents: read
