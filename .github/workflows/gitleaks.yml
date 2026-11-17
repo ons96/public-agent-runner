@@ -7,6 +7,10 @@ on:
 
 jobs:
   gitleaks:
+    # GitHub names the check after the job, and this job published lowercase
+    # "gitleaks" while branch protection requires "Gitleaks" - so no run could
+    # ever satisfy it and every PR here sat BLOCKED.
+    name: Gitleaks
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -18,3 +22,5 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Explicit path: gitleaks only auto-detects a root-level .gitleaks.toml.
+          GITLEAKS_CONFIG: .gitleaks/config.toml
