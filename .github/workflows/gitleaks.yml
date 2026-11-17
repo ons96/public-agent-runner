@@ -18,3 +18,5 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Explicit path: gitleaks only auto-detects a root-level .gitleaks.toml.
+          GITLEAKS_CONFIG: .gitleaks/config.toml
